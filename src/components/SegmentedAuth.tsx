@@ -8,13 +8,12 @@ export default function SegmentedAuth() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // 先回傳一個與實際按鈕同高度/外觀的 placeholder，避免 Hydration 差異與版面跳動
   if (!mounted) {
     return (
       <div
         aria-hidden
         className="inline-flex items-center rounded-full h-10 p-1 bg-gray-200 dark:bg-[#6c47ff] shadow-sm"
-        style={{ width: 232 }} // 依你目前按鈕寬度調整
+        style={{ width: 232 }}
       />
     );
   }
