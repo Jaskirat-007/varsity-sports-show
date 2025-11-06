@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Varsity Sports Show",
+  title: "Varsity Sports Shows",
   description: "Testing Auth UI",
 };
 
