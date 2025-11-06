@@ -1,4 +1,6 @@
-'use client';
+// app/live/page.tsx
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default function LivePage() {
   return (
