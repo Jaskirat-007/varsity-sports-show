@@ -15,9 +15,10 @@ export default function SignInPage() {
           </h1>
         </div>
 
-        {/* Sign In Card */}
         <div className="w-full max-w-sm">
-          <SignIn />
+          <div className="w-full max-w-sm">
+              <SignIn signUpUrl="/sign-up" />
+          </div>
 
           <p className="mt-3 text-center text-xs text-slate-500">
             If you encounter any problems, please contact info@varsitysportsshow.com
