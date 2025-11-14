@@ -1,40 +1,48 @@
 // src/app/api/streams/[slug]/route.ts
 import { NextResponse } from "next/server";
 
-// ---- Mock function: Then switch to a real database query. ----
-async function getStreamBySlug(slug: string) {
-// This will become a DB query in the future:
+type Stream = {
+  id: string;
+  slug: string;
+  title: string;
+  league: string;
+  schoolA: string;
+  schoolB: string;
+  startAt: string;
+  status: "live" | "upcoming" | "past";
+  access: "free" | "ppv" | "subscriber";
+  priceUSD?: number | null;
+  thumbnailUrl?: string | null;
+  dacastIframeSrc?: string | null;
+  dacastChannelId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
-// return await db.stream.findUnique({ where: { slug } });
-
-// This is fake data for testing; let the UI run first.
-  const MOCK_STREAM = {
+// Temporary mock; replace with real DB lookup later
+async function getStreamBySlug(slug: string): Promise<Stream | null> {
+  const mock: Stream = {
     id: "1",
-    slug: "wolves-vs-tigers-2025-11-14",
+    slug: "wolves-vs-tigers-2025-11-14-1900",
     title: "Wolves vs Tigers",
+    league: "HS Football",
     schoolA: "Desert Ridge",
     schoolB: "Mesa East",
-    league: "HS Football",
-    startAt: "2025-11-14T02:00:00.000Z",
+    startAt: "2025-11-15T02:00:00.000Z",
     status: "live",
     access: "free",
     priceUSD: null,
     thumbnailUrl: null,
-
-    // Change it to the Dacast source you actually want to play
-    dacastIframeSrc:
-      "https://iframe.dacast.com/live/12345/abcdefg12345",
-    dacastChannelId: "abcdefg12345",
-
+    dacastIframeSrc: "https://iframe.dacast.com/live/12345/abcdef",
+    dacastChannelId: "abcdef",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  if (slug === MOCK_STREAM.slug) return MOCK_STREAM;
+  if (slug === mock.slug) return mock;
   return null;
 }
 
-// ---- GET /api/streams/[slug] ----
 export async function GET(
   req: Request,
   { params }: { params: { slug: string } }
@@ -64,8 +72,8 @@ export async function GET(
         "Cache-Control": "no-store",
       },
     });
-  } catch (error) {
-    console.error("Error fetching stream:", error);
+  } catch (err) {
+    console.error("Error in GET /api/streams/[slug]:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
