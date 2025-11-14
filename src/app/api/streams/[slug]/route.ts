@@ -1,16 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+// src/app/api/streams/[slug]/route.ts
+import { NextResponse } from 'next/server';
 
-type RouteContext = {
-  params: {
-    slug: string;
-  };
-};
-
-export async function GET(req: NextRequest, { params }: RouteContext) {
-  const { slug } = params;
-
+export async function GET(req: Request, context: any) {
   return NextResponse.json({
-    message: 'OK',
-    slug,
+    ok: true,
+    message: 'temporary placeholder for /api/streams/[slug]',
   });
 }
