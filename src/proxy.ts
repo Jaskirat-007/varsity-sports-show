@@ -1,5 +1,5 @@
 // Const Import -> NOT CHANGE
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 // Non Login Page -> Edit if needed
@@ -12,6 +12,11 @@ const isPublicRoute = createRouteMatcher([
   "/_next/static(.*)",
   "/_next/image(.*)",
   "/images(.*)",      // <-- if you put files under /public/images
+]);
+
+const isAdminRoute = createRouteMatcher([
+  "/admin(.*)",     // /admin, /admin/dashboard
+  "/api/admin(.*)", // /api/admin/update-schedule
 ]);
 
 // clerkMiddleware

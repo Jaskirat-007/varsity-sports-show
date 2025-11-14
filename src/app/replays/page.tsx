@@ -1,4 +1,5 @@
-// app/live/page.tsx
+// app/replays/page.tsx
+// TODO ALL
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 

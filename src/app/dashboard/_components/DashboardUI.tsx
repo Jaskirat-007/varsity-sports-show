@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import {
-  Play,
-  Calendar,
-  Clock,
-  Search,
+  Play, // Open Icon
+  Calendar, // Upcoming Icon
+  Clock, // Past Icon
+  Search, // Search Icon
+  UserCog, // Shield Icon
   Filter as FilterIcon,
   Rows,
   Columns,
@@ -11,19 +12,230 @@ import {
   ExternalLink,
   Tv,
   Radio,
-} from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
+  Calendar as CalendarIcon
+} from "lucide-react"; // Custom SVG icons
+import { UserButton, useUser } from "@clerk/nextjs";
+import { RoleInitializer } from "./RoleInitializer"; // Set sign up user with role = viewer
+import { format } from "date-fns";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/dist/style.css";
+
+type StartTimeFieldProps = {
+  value: string;                    // ISO string
+  onChange: (value: string) => void;
+};
+
+export function StartTimeField({ value, onChange }: StartTimeFieldProps) {
+  const initialDate = value ? new Date(value) : new Date();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [date, setDate] = useState<Date>(initialDate);
+  const [hour, setHour] = useState<number>(() => {
+    const h = initialDate.getHours();
+    const h12 = h % 12 || 12;
+    return h12;
+  });
+  const [minute, setMinute] = useState<string>(() => {
+    const m = initialDate.getMinutes();
+    return String(m).padStart(2, "0");
+  });
+  const [ampm, setAmpm] = useState<"AM" | "PM">(
+    initialDate.getHours() >= 12 ? "PM" : "AM"
+  );
+  const [open, setOpen] = useState<boolean>(false);
+
+  // Assemble the internal state into an ISO string and pass it to the parent layer.
+  const updateIso = (d: Date, h12: number, min: string, meridiem: "AM" | "PM") => {
+    const cloned = new Date(d);
+    const hour24 =
+      meridiem === "PM"
+        ? (h12 % 12) + 12
+        : h12 % 12; // 12 AM -> 0, 12 PM -> 12
+
+    cloned.setHours(hour24);
+    cloned.setMinutes(Number(min));
+    cloned.setSeconds(0);
+    cloned.setMilliseconds(0);
+
+    onChange(cloned.toISOString());
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      // If the click is not in the dropdown panel → Collapse
+      if (panelRef.current && !panelRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+
+    // Listen for mousedown (faster response than click).
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
+  // When the value changes externally (e.g., a form reset), synchronize back.
+  useEffect(() => {
+    if (!value) return;
+    const d = new Date(value);
+    const h = d.getHours();
+    const h12 = h % 12 || 12;
+    const m = d.getMinutes();
+    setDate(d);
+    setHour(h12);
+    setMinute(String(m).padStart(2, "0"));
+    setAmpm(h >= 12 ? "PM" : "AM");
+  }, [value]);
+
+  // The text displayed on the main button: Feb 14, 2025 · 7:00 PM
+  const displayText = `${format(date, "MMM dd, yyyy")} · ${format(
+    new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      ampm === "PM" ? (hour % 12) + 12 : hour % 12,
+      Number(minute)
+    ),
+    "h:mm a"
+  )}`;
+
+  const minuteOptions = Array.from({ length: 60 }, (_, i) =>
+    String(i).padStart(2, "0")
+  );
+
+  return (
+    <div className="space-y-2 relative">
+      {/* Main button: Displays the currently selected time. */}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left hover:border-neutral-400 bg-white"
+      >
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-4 w-4 text-neutral-600" />
+          <span className="text-sm text-neutral-900">{displayText}</span>
+        </div>
+        <Clock className="h-4 w-4 text-neutral-500" />
+      </button>
+
+      {/* Dropdown Panel */}
+      {open && (
+        <div className="mt-2 grid gap-4 rounded-2xl border bg-white p-4 shadow-xl sm:grid-cols-[1.4fr_1fr]" ref={panelRef}>
+          {/* Left side：Calendar */}
+          <div>
+            <DayPicker
+              mode="single"
+              selected={date}
+              onSelect={(selectedDate) => {
+                if (!selectedDate) return;
+                setDate(selectedDate);
+                updateIso(selectedDate, hour, minute, ampm);
+              }}
+              weekStartsOn={0} // Sunday
+            />
+          </div>
+
+          {/* Right side: Time + AM/PM + Quick Select */}
+          <div className="flex flex-col gap-3">
+            {/* Subtitle */}
+            <div>
+              <div className="text-sm font-medium text-neutral-900">
+                Time (Phoenix Local Time)
+              </div>
+            </div>
+
+            {/* Time + AM/PM switch */}
+            <div className="flex items-center gap-2">
+              {/* Hour */}
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={hour}
+                onChange={(e) => {
+                  const val = Math.min(12, Math.max(1, Number(e.target.value) || 1));
+                  setHour(val);
+                  updateIso(date, val, minute, ampm);
+                }}
+                className="w-16 rounded-lg border px-2 py-1 text-center text-sm"
+              />
+
+              <span className="text-sm text-neutral-600">:</span>
+
+              {/* Minute */}
+              <input
+                type="number"
+                min={0}
+                max={59}
+                value={minute}
+                onChange={(e) => {
+                  let val = Number(e.target.value);
+                  val = Math.min(59, Math.max(0, val));
+                  const padded = String(val).padStart(2, "0");
+                  setMinute(padded);
+                  updateIso(date, hour, padded, ampm);
+                }}
+                className="w-16 rounded-lg border px-2 py-1 text-center text-sm"
+              />
+
+              {/* AM / PM segmented control */}
+              <div className="inline-flex rounded-full border border-neutral-300 bg-neutral-50 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAmpm("AM");
+                    updateIso(date, hour, minute, "AM");
+                  }}
+                  className={`px-2 py-1 rounded-full ${
+                    ampm === "AM" ? "bg-black text-white" : "text-neutral-700"
+                  }`}
+                >
+                  AM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAmpm("PM");
+                    updateIso(date, hour, minute, "PM");
+                  }}
+                  className={`px-2 py-1 rounded-full ${
+                    ampm === "PM" ? "bg-black text-white" : "text-neutral-700"
+                  }`}
+                >
+                  PM
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // --- UI helpers ---
-// (For demo) Replace with real RBAC using Clerk org roles/claims
-const isAdmin = true; // TODO: read from Clerk session/claims
+const useIsAdmin = () => {
+  const { user } = useUser();
+  const role = (user?.unsafeMetadata?.role as string | undefined) ?? "viewer";
 
+  return role === "admin";
+};
+
+// --- Badge: Status tags---
 function Badge({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${className}`}>{children}</span>
   );
 }
 
+// --- Pill: Rounded corner buttons are used to switch states (tabs / filters).---
 function Pill({ active, children, onClick }: { active?: boolean; children: React.ReactNode; onClick?: () => void }) {
   return (
     <button
@@ -39,6 +251,7 @@ function Pill({ active, children, onClick }: { active?: boolean; children: React
   );
 }
 
+// --- Card: A card container used to enclose each Stream. ---
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`rounded-2xl border border-neutral-200 bg-white shadow-sm hover:shadow-md transition ${className}`}>
@@ -47,8 +260,8 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-// --- Types & mock data ---
-export type StreamStatus = "live" | "upcoming" | "ended";
+// --- Types ---
+export type StreamStatus = "live" | "upcoming" | "past";
 export type Stream = {
   id: string;
   title: string;
@@ -62,8 +275,9 @@ export type Stream = {
   slug: string; // /live/[slug]
 };
 
+// --- Mock Data remove or add for testing ---
 const MOCK_STREAMS: Stream[] = [
-  {
+{
     id: "1",
     title: "Friday Night Lights: Wolves vs. Tigers",
     league: "HS Football",
@@ -95,7 +309,7 @@ const MOCK_STREAMS: Stream[] = [
     schoolB: "Gilbert Bears",
     startAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
     priceUSD: undefined,
-    status: "ended",
+    status: "past",
     thumbnail: "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=1200&q=80&auto=format&fit=crop",
     slug: "suns-vs-bears-2025-finals",
   },
@@ -113,15 +327,13 @@ const MOCK_STREAMS: Stream[] = [
   },
 ];
 
-// --- Stream card ---
+// --- Stream card Info with Livestream Data Structure ---
 function StreamCard({
   stream,
   layout = "grid",
-  onDelete,
 }: {
   stream: Stream;
   layout?: "grid" | "list";
-  onDelete?: (id: string) => void;
 }) {
   const date = new Date(stream.startAt);
   const timeText = date.toLocaleString(undefined, {
@@ -132,10 +344,11 @@ function StreamCard({
     minute: "2-digit",
   });
 
+  // LIVE | Upcoming | Past
   const statusStyles: Record<StreamStatus, string> = {
     live: "bg-red-50 text-red-700 ring-1 ring-red-200",
     upcoming: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
-    ended: "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200",
+    past: "bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200",
   };
 
   return (
@@ -148,17 +361,17 @@ function StreamCard({
           <div className="absolute left-2 top-2 flex items-center gap-2">
             <Badge className={statusStyles[stream.status] + " backdrop-blur"}>
               {stream.status === "live" ? (
-                <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" /> LIVE</span>
+                <span className="inline-flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" /> LIVE</span> // LIVE Badge
               ) : stream.status === "upcoming" ? (
-                <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> Upcoming</span>
+                <span className="inline-flex items-center gap-1"><Calendar className="h-3 w-3" /> Upcoming</span> // Upcoming Badge
               ) : (
-                <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Past</span>
+                <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Past</span> // Past Badge
               )}
             </Badge>
             {typeof stream.priceUSD === "number" ? (
-              <Badge className="bg-amber-50 text-amber-700 ring-1 ring-amber-200"><Ticket className="h-3 w-3 mr-1" />${stream.priceUSD.toFixed(2)}</Badge>
+              <Badge className="bg-amber-50 text-amber-700 ring-1 ring-amber-200"><Ticket className="h-3 w-3 mr-1" />${stream.priceUSD.toFixed(2)}</Badge> // Single Ticket Badge 
             ) : (
-              <Badge className="bg-sky-50 text-sky-700 ring-1 ring-sky-200">Free</Badge>
+              <Badge className="bg-sky-50 text-sky-700 ring-1 ring-sky-200"><Ticket className="h-3 w-3 mr-1" />Free</Badge> // Free Ticket Badge
             )}
           </div>
         </div>
@@ -167,13 +380,16 @@ function StreamCard({
       <div className={layout === "list" ? "flex-1 p-4" : "p-4"}>
         <div className="flex items-start justify-between gap-3">
           <div>
+            {/* Livestream Title */}
             <h3 className="text-base font-semibold leading-tight line-clamp-2">{stream.title}</h3>
             <p className="mt-1 text-sm text-neutral-600">
+              {/* schoolA vs schoolB and League Info */}
               <span className="font-medium">{stream.schoolA}</span> vs <span className="font-medium">{stream.schoolB}</span>
               <span className="mx-2">·</span>
               <span className="text-neutral-500">{stream.league}</span>
             </p>
           </div>
+          {/* Open Button check if Live, open external link to /live/[slug] */}
           <a
             href={`/live/${stream.slug}`}
             className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-50"
@@ -182,6 +398,8 @@ function StreamCard({
             {stream.status === "live" ? <Play className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />} Open
           </a>
         </div>
+
+        {/* Livestream Time Info */}
         <div className="mt-2 text-sm text-neutral-600 flex items-center gap-2">
           <Calendar className="h-4 w-4" />
           <span>{timeText}</span>
@@ -191,155 +409,58 @@ function StreamCard({
   );
 }
 
-// --- Empty state ---
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center">
-      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100">
-        <Tv className="h-6 w-6 text-neutral-600" />
-      </div>
-      <h3 className="text-lg font-semibold">No streams {label}</h3>
-      <p className="mt-1 text-sm text-neutral-600">Check back later or browse other categories.</p>
-    </div>
-  );
-}
+// --- Empty state: if no stream data ---
+type EmptyStateVariant = "live" | "upcoming" | "past";
+function EmptyState({ variant }: { variant: EmptyStateVariant }) {
+  const config = {
+    live: {
+      icon: Tv,
+      title: "No live games right now",
+      description:
+        "When a game is live, it will appear here automatically. You can still browse upcoming games or replays below.",
+    },
+    upcoming: {
+      icon: Calendar,
+      title: "No upcoming games yet",
+      description:
+        "Once new games are scheduled, they will show up here. Check back soon or follow your school for updates.",
+    },
+    past: {
+      icon: Clock,
+      title: "No past games in your history",
+      description:
+        "Replays will appear here after games have ended. Watch live or upcoming games in the meantime.",
+    },
+  }[variant];
 
-// --- Create Stream Modal (admin) ---
-function CreateStreamModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (s: Stream) => void }) {
-  const [title, setTitle] = useState("");
-  const [league, setLeague] = useState("HS Football");
-  const [schoolA, setSchoolA] = useState("");
-  const [schoolB, setSchoolB] = useState("");
-  const [startAt, setStartAt] = useState<string>(new Date(Date.now() + 3_600_000).toISOString().slice(0,16)); // datetime-local value
-  const [price, setPrice] = useState<string>("6.99");
-  const [thumbnail, setThumbnail] = useState("");
-  const [sourceUrl, setSourceUrl] = useState(""); // e.g., m3u8 or Dacast channel id
-  const [access, setAccess] = useState<'free'|'ppv'|'subscriber'>("ppv");
-  const [submitting, setSubmitting] = useState(false);
-
-  if (!open) return null;
-
-  const toSlug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 64);
-
-  const handleCreate = async () => {
-    if (!title || !schoolA || !schoolB) return alert("Title/Schools are required");
-    const priceNum = access === 'free' ? undefined : Number(price || 0);
-    const payload = {
-      title,
-      league,
-      schoolA,
-      schoolB,
-      startAt: new Date(startAt).toISOString(),
-      priceUSD: priceNum,
-      status: new Date(startAt).getTime() <= Date.now() ? 'live' as const : 'upcoming' as const,
-      thumbnail: thumbnail || "https://images.unsplash.com/photo-1521417531039-6949f3f9f2b5?w=1200&auto=format&fit=crop",
-      slug: toSlug(`${schoolA}-${schoolB}-${title}`),
-      sourceUrl,
-      access,
-    };
-
-    try {
-      setSubmitting(true);
-      // --- optimistic demo --- replace with real POST /api/streams
-      // await fetch('/api/streams', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})
-      const created: Stream = {
-        id: String(Math.random()).slice(2),
-        title: payload.title,
-        league: payload.league,
-        schoolA: payload.schoolA,
-        schoolB: payload.schoolB,
-        startAt: payload.startAt,
-        priceUSD: payload.priceUSD,
-        status: payload.status,
-        thumbnail: payload.thumbnail,
-        slug: payload.slug,
-      };
-      onCreated(created);
-      onClose();
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const Icon = config.icon;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b p-4">
-          <h3 className="text-lg font-semibold">Create Livestream</h3>
-          <button onClick={onClose} className="rounded-full border px-3 py-1.5 text-sm">Close</button>
-        </div>
-        <div className="grid gap-4 p-4 sm:grid-cols-2">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Title</span>
-            <input value={title} onChange={(e)=>setTitle(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="e.g., Wolves vs Tigers" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">League</span>
-            <input value={league} onChange={(e)=>setLeague(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="HS Football" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Home / School A</span>
-            <input value={schoolA} onChange={(e)=>setSchoolA(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="Desert Ridge" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Away / School B</span>
-            <input value={schoolB} onChange={(e)=>setSchoolB(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="Mesa East" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Start Time</span>
-            <input type="datetime-local" value={startAt} onChange={(e)=>setStartAt(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Access</span>
-            <select value={access} onChange={(e)=>setAccess(e.target.value as any)} className="w-full rounded-lg border px-3 py-2 text-sm">
-              <option value="free">Free</option>
-              <option value="ppv">Pay‑per‑view</option>
-              <option value="subscriber">Subscribers only</option>
-            </select>
-          </label>
-          {access !== 'free' && (
-            <label className="space-y-1">
-              <span className="text-sm font-medium">Price (USD)</span>
-              <input value={price} onChange={(e)=>setPrice(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="6.99" />
-            </label>
-          )}
-          <label className="space-y-1 sm:col-span-2">
-            <span className="text-sm font-medium">Thumbnail URL</span>
-            <input value={thumbnail} onChange={(e)=>setThumbnail(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="https://..." />
-          </label>
-          <label className="space-y-1 sm:col-span-2">
-            <span className="text-sm font-medium">Stream Source (m3u8 / Dacast Channel ID)</span>
-            <input value={sourceUrl} onChange={(e)=>setSourceUrl(e.target.value)} className="w-full rounded-lg border px-3 py-2 text-sm" placeholder="e.g., https://.../index.m3u8 or 12345" />
-          </label>
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t p-4">
-          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-          <button disabled={submitting} onClick={handleCreate} className="rounded-lg bg-black px-4 py-2 text-sm font-medium text-white">
-            {submitting ? 'Creating…' : 'Create'}
-          </button>
-        </div>
+    <div className="rounded-2xl border border-dashed border-neutral-200 bg-gradient-to-br from-neutral-50 via-white to-neutral-100 p-10 text-center shadow-sm">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-900 text-white shadow-md shadow-neutral-300/60">
+        <Icon className="h-6 w-6" />
       </div>
+      <h3 className="text-lg font-semibold text-neutral-900">
+        {config.title}
+      </h3>
+      <p className="mt-2 max-w-md mx-auto text-sm text-neutral-600">
+        {config.description}
+      </p>
     </div>
   );
 }
 
 // --- Main Dashboard ---
 export default function DashboardUI() {
+  const isAdmin = useIsAdmin();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<StreamStatus | "all">("all");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
-
-  const [createOpen, setCreateOpen] = useState(false);
-  const [streams, setStreams] = useState<Stream[]>(MOCK_STREAMS);
+  const [viewMode, setViewMode] = useState<"viewer" | "admin">("viewer");
+  const [streams, setStreams] = useState<Stream[]>(MOCK_STREAMS); // TODO: Delete MOCK_STREAMS and replace with [] when official launch
 
   const filtered = useMemo(() => {
     return streams.filter((s) => (tab === "all" ? true : s.status === tab)).filter((s) => {
-      const q = query.trim().toLowerCase();
-      if (!q) return true;
-      const hay = `${s.title} ${s.schoolA} ${s.schoolB} ${s.league}`.toLowerCase();
-      return hay.includes(q);
-    });
-    return MOCK_STREAMS.filter((s) => (tab === "all" ? true : s.status === tab)).filter((s) => {
       const q = query.trim().toLowerCase();
       if (!q) return true;
       const hay = `${s.title} ${s.schoolA} ${s.schoolB} ${s.league}`.toLowerCase();
@@ -349,16 +470,18 @@ export default function DashboardUI() {
 
   const live = filtered.filter((s) => s.status === "live");
   const upcoming = filtered.filter((s) => s.status === "upcoming");
-  const ended = filtered.filter((s) => s.status === "ended");
+  const past = filtered.filter((s) => s.status === "past");
 
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Header */}
+      <RoleInitializer />
+
       <header className="sticky top-0 z-20 border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold leading-tight">Dashboard</h1>
+              <h1 className="text-2xl font-bold leading-tight">VSS Live</h1>
               <p className="text-sm text-neutral-600">Welcome back! Browse your live and upcoming games.</p>
             </div>
 
@@ -377,28 +500,59 @@ export default function DashboardUI() {
                 <Pill active={tab === "all"} onClick={() => setTab("all")}>All</Pill>
                 <Pill active={tab === "live"} onClick={() => setTab("live")}>Live</Pill>
                 <Pill active={tab === "upcoming"} onClick={() => setTab("upcoming")}>Upcoming</Pill>
-                <Pill active={tab === "ended"} onClick={() => setTab("ended")}>Past</Pill>
+                <Pill active={tab === "past"} onClick={() => setTab("past")}>Past</Pill>
               </div>
 
               <div className="flex items-center gap-1 rounded-full border border-neutral-200 bg-white p-1">
+                {/* Grid */}
                 <button
-                  onClick={() => setLayout("grid")}
+                  onClick={() => {
+                    setLayout("grid");
+                    setViewMode("viewer");
+                  }}
                   className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm ${
-                    layout === "grid" ? "bg-black text-white" : "hover:bg-neutral-50"
+                    viewMode === "viewer" && layout === "grid"
+                      ? "bg-black text-white"
+                      : "hover:bg-neutral-50"
                   }`}
                   title="Grid"
                 >
-                  <Columns className="h-4 w-4" /> Grid
+                  <Columns className="h-4 w-4" />
+                  Grid
                 </button>
+
+                {/* List */}
                 <button
-                  onClick={() => setLayout("list")}
+                  onClick={() => {
+                    setLayout("list");
+                    setViewMode("viewer");
+                  }}
                   className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm ${
-                    layout === "list" ? "bg-black text-white" : "hover:bg-neutral-50"
+                    viewMode === "viewer" && layout === "list"
+                      ? "bg-black text-white"
+                      : "hover:bg-neutral-50"
                   }`}
                   title="List"
                 >
-                  <Rows className="h-4 w-4" /> List
+                  <Rows className="h-4 w-4" />
+                  List
                 </button>
+
+                {/* Admin（Only admin can see） */}
+                {isAdmin && (
+                  <button
+                    onClick={() => setViewMode("admin")}
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm ${
+                      viewMode === "admin"
+                        ? "bg-black text-white"
+                        : "hover:bg-neutral-50 text-neutral-700"
+                    }`}
+                    title="Admin tools"
+                  >
+                    <UserCog className="h-4 w-4" />
+                    Admin
+                  </button>
+                )}
               </div>
             </div>
 
@@ -416,122 +570,276 @@ export default function DashboardUI() {
         </div>
       </header>
 
-      {/* Admin Create Stream */}
-      {isAdmin && (
-        <div className="mx-auto max-w-7xl px-4 pt-4">
-          <div className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-base font-semibold">Sponsor tools</h3>
-                <p className="text-sm text-neutral-600">Create or manage livestream pages. Published items appear above.</p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={()=>setCreateOpen(true)} className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white">Create livestream</button>
-                <a href="/dashboard/streams" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50">Manage all</a>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <CreateStreamModal
-        open={createOpen}
-        onClose={()=>setCreateOpen(false)}
-        onCreated={(s)=> setStreams((prev)=>[s, ...prev])}
-      />
-
-      {/* Body */}
+      {/* Body of the Dashboard */}
       <main className="mx-auto max-w-7xl px-4 py-6">
-        {/* Live section */}
-        {tab === "all" || tab === "live" ? (
-          <section className="mb-8">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Live now</h2>
-              <a href="/live" className="text-sm text-neutral-700 hover:underline">View all</a>
-            </div>
-            {live.length === 0 ? (
-              <EmptyState label="live right now" />
-            ) : layout === "grid" ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {live.map((s) => (
-                  <StreamCard key={s.id} stream={s} layout="grid" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {live.map((s) => (
-                  <StreamCard key={s.id} stream={s} layout="list" />
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
+        {/* Admin Mode */}
+        {viewMode === "admin" && isAdmin && (
+          <AdminPanel onCreated={(s) => setStreams((prev) => [s, ...prev])} />
+        )}
 
-        {/* Upcoming */}
-        {tab === "all" || tab === "upcoming" ? (
-          <section className="mb-8">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Upcoming</h2>
-              <button className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm hover:bg-neutral-50">
-                <FilterIcon className="h-4 w-4" /> Filters
-              </button>
-            </div>
-            {upcoming.length === 0 ? (
-              <EmptyState label="upcoming yet" />
-            ) : layout === "grid" ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {upcoming.map((s) => (
-                  <StreamCard key={s.id} stream={s} layout="grid" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {upcoming.map((s) => (
-                  <StreamCard key={s.id} stream={s} layout="list" />
-                ))}
-              </div>
-            )}
-          </section>
-        ) : null}
+        {/* Viewer Mode */}
+        {viewMode === "viewer" && (
+          <>
+            { /* Live Now section */ }
+            {(tab === "all" || tab === "live") && (
+              <section className="mb-8">
+                {/* Section grid / View all Button*/}
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Live now</h2>
+                  <a href="/live" className="text-sm text-neutral-700 hover:underline">View all</a>
+                </div>
 
-        {/* Past */}
-        {tab === "all" || tab === "ended" ? (
-          <section className="mb-8">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Past Games</h2>
-              <a href="/replays" className="text-sm text-neutral-700 hover:underline">Browse replays</a>
-            </div>
-            {ended.length === 0 ? (
-              <EmptyState label="in your history" />
-            ) : layout === "grid" ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {ended.map((s) => (
-                  <StreamCard key={s.id} stream={s} layout="grid" />
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {ended.map((s) => (
-                  <StreamCard key={s.id} stream={s} layout="list" />
-                ))}
-              </div>
+                {live.length === 0 ? (
+                  <EmptyState variant="live" />
+                ) : layout === "grid" ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {live.map((s) => (
+                      <StreamCard key={s.id} stream={s} layout="grid" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {live.map((s) => (
+                      <StreamCard key={s.id} stream={s} layout="list" />
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
-          </section>
-        ) : null}
 
-        {/* Footer CTA */}
-        <div className="mt-12 rounded-2xl border border-neutral-200 bg-gradient-to-br from-neutral-50 to-white p-6 text-center">
-          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100">
-            <Radio className="h-5 w-5 text-neutral-600" />
-          </div>
-          <h3 className="text-lg font-semibold">Looking for a specific matchup?</h3>
-          <p className="mt-1 text-sm text-neutral-600">Use the search above or go to the full schedule to find your team.</p>
-          <div className="mt-4 inline-flex gap-2">
-            <a href="/schedule" className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white">Full schedule</a>
-            <a href="/subscriptions" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50">Subscription plans</a>
-          </div>
-        </div>
+            { /* Upcoming section */ }
+            {tab === "all" || tab === "upcoming" ? (
+              <section className="mb-8">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Upcoming</h2>
+                  <button className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-sm hover:bg-neutral-50">
+                    <FilterIcon className="h-4 w-4" /> Filters
+                  </button>
+                </div>
+
+                {upcoming.length === 0 ? (
+                  <EmptyState variant="upcoming" />
+                ) : layout === "grid" ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {upcoming.map((s) => (
+                      <StreamCard key={s.id} stream={s} layout="grid" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {upcoming.map((s) => (
+                      <StreamCard key={s.id} stream={s} layout="list" />
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            { /* Past Games section */ }
+            {tab === "all" || tab === "past" ? (
+              <section className="mb-8">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Past Games</h2>
+                  <a href="/replays" className="text-sm text-neutral-700 hover:underline">Browse replays</a>
+                </div>
+
+                {past.length === 0 ? (
+                  <EmptyState variant="past" />
+                ) : layout === "grid" ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {past.map((s) => (
+                      <StreamCard key={s.id} stream={s} layout="grid" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {past.map((s) => (
+                      <StreamCard key={s.id} stream={s} layout="list" />
+                    ))}
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {/* Footer CTA */}
+            <div className="mt-12 rounded-2xl border border-neutral-200 bg-gradient-to-br from-neutral-50 to-white p-6 text-center">
+              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100">
+                <Radio className="h-5 w-5 text-neutral-600" />
+              </div>
+
+              <h3 className="text-lg font-semibold">Looking for a specific matchup?</h3>
+              <p className="mt-1 text-sm text-neutral-600">Use the search above or go to the full schedule to find your team.</p>
+              <div className="mt-4 inline-flex gap-2">
+                <a href="https://varsitysportsshow.com/schedule" target="_blank" rel="noopener noreferrer" className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white">Full schedule</a>
+                <a href="https://varsitysportsshow.com/plans" target="_blank" rel="noopener noreferrer" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50">Subscription plans</a>
+              </div>
+              
+            </div>
+          </>
+        )}
+
+
       </main>
+    </div>
+  );
+}
+
+// Admin Panel
+function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
+  const [title, setTitle] = useState("");
+  const [league, setLeague] = useState("");
+  const [schoolA, setSchoolA] = useState("");
+  const [schoolB, setSchoolB] = useState("");
+  const [startAt, setStartAt] = useState<string>(
+    () => new Date().toISOString()
+  );
+  const [price, setPrice] = useState("6.99");
+  const [thumbnail, setThumbnail] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [access, setAccess] = useState<"free" | "ppv" | "subscriber">("free");
+  const [submitting, setSubmitting] = useState(false);
+
+  const toSlug = (t: string) =>
+    t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+  const handleCreate = async () => {
+    if (!title || !schoolA || !schoolB)
+      return alert("Title and schools are required");
+
+    try {
+      setSubmitting(true);
+      const created: Stream = {
+        id: Date.now().toString(),
+        title,
+        league,
+        schoolA,
+        schoolB,
+        startAt: new Date(startAt).toISOString(),
+        priceUSD: access === "free" ? undefined : Number(price),
+        status:
+          new Date(startAt).getTime() <= Date.now()
+            ? "live"
+            : "upcoming",
+        thumbnail:
+          thumbnail ||
+          "https://images.unsplash.com/photo-1521417531039-6949f3f9f2b5?w=1200&auto=format&fit=crop",
+        slug: toSlug(`${schoolA}-${schoolB}-${title}`),
+      };
+
+      onCreated(created);
+      alert("Stream created!");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <h2 className="text-lg font-semibold mb-4">Create Livestream</h2>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label>
+          <div className="text-sm font-medium mb-1">Title</div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Wolves vs Tigers"
+          />
+        </label>
+
+        <label>
+          <div className="text-sm font-medium mb-1">League</div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            value={league}
+            onChange={(e) => setLeague(e.target.value)}
+            placeholder="HS Football"
+          />
+        </label>
+
+        <label>
+          <div className="text-sm font-medium mb-1">Home / School A</div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            value={schoolA}
+            onChange={(e) => setSchoolA(e.target.value)}
+            placeholder="Desert Ridge"
+          />
+        </label>
+
+        <label>
+          <div className="text-sm font-medium mb-1">Away / School B</div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            value={schoolB}
+            onChange={(e) => setSchoolB(e.target.value)}
+            placeholder="Mesa East"
+          />
+        </label>
+
+        <label>
+          <div className="text-sm font-medium mb-1">Start Time</div>
+          <StartTimeField
+            value={startAt}
+            onChange={(iso) => setStartAt(iso)}
+          />
+        </label>
+
+        <label>
+          <div className="text-sm font-medium mb-1">Access</div>
+          <select
+            className="w-full border rounded-lg px-3 py-2"
+            value={access}
+            onChange={(e) => setAccess(e.target.value as any)}
+          >
+            <option value="free">Free</option>
+            <option value="ppv">Pay-per-view</option>
+            <option value="subscriber">Subscriber only</option>
+          </select>
+        </label>
+
+        {access !== "free" && (
+          <label>
+            <div className="text-sm font-medium mb-1">Price</div>
+            <input
+              className="w-full border rounded-lg px-3 py-2"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+          </label>
+        )}
+
+        <label className="sm:col-span-2">
+          <div className="text-sm font-medium mb-1">
+            Thumbnail URL
+          </div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            value={thumbnail}
+            onChange={(e) => setThumbnail(e.target.value)}
+            placeholder="https://..."
+          />
+        </label>
+
+        <label className="sm:col-span-2">
+          <div className="text-sm font-medium mb-1">Stream Source (Dacast Channel ID)</div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+            placeholder="e.g., https://.../index.m3u8 or 12345"
+          />
+        </label>
+      </div>
+
+      <button
+        onClick={handleCreate}
+        disabled={submitting}
+        className="mt-6 rounded-full bg-black px-5 py-2 text-sm font-medium text-white"
+      >
+        {submitting ? "Creating..." : "Create livestream"}
+      </button>
     </div>
   );
 }
