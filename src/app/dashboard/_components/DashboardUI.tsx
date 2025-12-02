@@ -13,6 +13,7 @@ import {
   Tv,
   Radio,
   DotIcon,
+  Trash2,
   Calendar as CalendarIcon
 } from "lucide-react"; // Custom SVG icons
 import { UserButton, useUser } from "@clerk/nextjs";
@@ -288,6 +289,7 @@ export type Stream = {
   status: StreamStatus;
   thumbnail: string; // url or placeholder
   slug: string; // /live/[slug]
+  sourceUrl: string; 
 };
 
 // --- Fixed Data ---
@@ -303,6 +305,7 @@ const MOCK_STREAMS_test: Stream[] = [
     status: "live",
     thumbnail: "https://cdn.forumcomm.com/dims4/default/6df5ee2/2147483647/strip/true/crop/4000x2667+0+1/resize/840x560!/format/webp/quality/90/?url=https%3A%2F%2Fforum-communications-production-web.s3.us-west-2.amazonaws.com%2Fbrightspot%2Fc8%2Fa7%2F7aed3ece422ca6707ceb7d646ab0%2F111425-hsfb-howard-wall-class9a-12.jpg",
     slug: "wolves-vs-tigers-2025w10",
+    sourceUrl: "https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990",
   },
 ];
 
@@ -319,6 +322,7 @@ const MOCK_STREAMS: Stream[] = [
     status: "live",
     thumbnail: "https://images.unsplash.com/photo-1546527868-ccb7ee7dfa6a?w=1200&q=80&auto=format&fit=crop",
     slug: "wolves-vs-tigers-2025w10",
+    sourceUrl: "https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990",
   },
   {
     id: "2",
@@ -331,6 +335,7 @@ const MOCK_STREAMS: Stream[] = [
     status: "upcoming",
     thumbnail: "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=1200&q=80&auto=format&fit=crop",
     slug: "hawks-at-cougars-2025w10",
+    sourceUrl: "https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990",
   },
   {
     id: "3",
@@ -343,6 +348,7 @@ const MOCK_STREAMS: Stream[] = [
     status: "past",
     thumbnail: "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=1200&q=80&auto=format&fit=crop",
     slug: "suns-vs-bears-2025-finals",
+    sourceUrl: "https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990",
   },
   {
     id: "4",
@@ -355,6 +361,7 @@ const MOCK_STREAMS: Stream[] = [
     status: "upcoming",
     thumbnail: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&q=80&auto=format&fit=crop",
     slug: "knights-vs-mustangs-2025-semi",
+    sourceUrl: "https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990",
   },
 ];
 
@@ -743,11 +750,27 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
     t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
   const handleCreate = async () => {
-    if (!title || !schoolA || !schoolB)
-      return alert("Title and schools are required");
+      const requiredFields = [
+      { value: title, name: "Title" },
+      { value: schoolA, name: "Home / School A" },
+      { value: schoolB, name: "Away / School B" },
+      { value: league, name: "League" },
+      { value: startAt, name: "Start Time" },
+      { value: access, name: "Access" },
+      { value: thumbnail, name: "Thumbnail URL" },
+      { value: sourceUrl, name: "Stream Source" },
+    ];
+
+    for (const field of requiredFields) {
+      if (!field.value || field.value.toString().trim() === "") {
+        alert(`${field.name} is required`);
+        return;
+      }
+    }
 
     try {
       setSubmitting(true);
+
       const created: Stream = {
         id: Date.now().toString(),
         title,
@@ -761,9 +784,9 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
             ? "live"
             : "upcoming",
         thumbnail:
-          thumbnail ||
-          "https://images.unsplash.com/photo-1521417531039-6949f3f9f2b5?w=1200&auto=format&fit=crop",
+          thumbnail,
         slug: toSlug(`${schoolA}-${schoolB}-${title}`),
+        sourceUrl,
       };
 
       onCreated(created);
@@ -775,7 +798,7 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
 
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-      <h2 className="text-lg font-semibold mb-4">Create Livestream</h2>
+      <h2 className="text-lg font-semibold mb-4">Create Livestream - TESTING Feature Not Submit</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label>
@@ -852,23 +875,46 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
 
         <label className="sm:col-span-2">
           <div className="text-sm font-medium mb-1">
-            Thumbnail URL
+            Thumbnail URL (This will appear at the dashboard grid, Fill in for preview below)
           </div>
-          <input
-            className="w-full border rounded-lg px-3 py-2"
-            value={thumbnail}
-            onChange={(e) => setThumbnail(e.target.value)}
-            placeholder="https://..."
-          />
+          <div className="relative">
+            <input required
+              className="w-full border rounded-lg px-3 py-2"
+              value={thumbnail}
+              onChange={(e) => setThumbnail(e.target.value)}
+              placeholder="e.g., https://images.unsplash.com/photo-1546527868-ccb7ee7dfa6a?w=1200&q=80&auto=format&fit=crop"
+            />
+            <button
+              type="button"
+              onClick={() => setThumbnail("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+
+          {thumbnail && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 mb-1">Thumbnail Preview:</p>
+              <img
+                src={thumbnail}
+                alt="Thumbnail preview"
+                className="w-48 h-28 object-cover rounded border"
+                onError={(e) => {
+                  e.currentTarget.src = "";
+                }}
+              />
+            </div>
+          )}
         </label>
 
         <label className="sm:col-span-2">
-          <div className="text-sm font-medium mb-1">Stream Source (Dacast Channel ID)</div>
+          <div className="text-sm font-medium mb-1">Stream Source (Click Dacast share link to get iframe URL & Paste here)</div>
           <input
             className="w-full border rounded-lg px-3 py-2"
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
-            placeholder="e.g., https://.../index.m3u8 or 12345"
+            placeholder="e.g., https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990"
           />
         </label>
       </div>
