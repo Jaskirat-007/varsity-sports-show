@@ -1,20 +1,19 @@
-// src/app/live/[slug]/page.tsx
-// Design UI: TODO implement the real iframe
+// Fixed Page for Testing Dacast Feature
 
 type LivePageProps = {
   params: { slug: string };
 };
 
-// This is a simple mock stream; you can replace it when you need to connect real data.
+// This is a simple mock stream
 const MOCK_STREAM = {
-  title: "Wolves vs Tigers",
-  league: "HS Football",
-  schoolA: "Desert Ridge",
-  schoolB: "Mesa East",
+  title: "Varsity Sports Show Live Stream",
+  league: "Sports",
+  schoolA: "Test01",
+  schoolB: "Test02",
   startAt: new Date().toISOString(),
   status: "live" as const,
-  access: "ppv",
-  priceUSD: 3.99 as number | null,
+  access: "free",
+  priceUSD: 0 as number | null,
 };
 
 export default function LivePage({ params }: LivePageProps) {
@@ -43,7 +42,7 @@ export default function LivePage({ params }: LivePageProps) {
     <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">
       {/* This displays the current slug for your testing convenience. */}
       <p className="text-xs text-neutral-500">
-        Testing Livestream UI Page <span className="font-mono">{slug}</span>
+        VSS Test Livestream <span className="font-mono">{slug}</span>
       </p>
 
       {/* Header */}
@@ -68,24 +67,24 @@ export default function LivePage({ params }: LivePageProps) {
         <p className="text-xs text-neutral-500">{dateText}</p>
       </header>
 
-      {/* Player section (currently using a fake UI) */}
+      {/* Player section */}
       <section className="aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-xl flex items-center justify-center">
-        <iframe 
-        id="80cea297-81e0-24ec-924b-772c26b87f56-live-a2edb7a8-c226-4478-861f-539a00109990" 
-        src="https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990" 
-        width="100%" 
-        height="100%" 
-        scrolling="no" 
-        allow="autoplay; encrypted-media"
-        allowFullScreen
-        ></iframe>
+        <iframe
+            id="80cea297-81e0-24ec-924b-772c26b87f56-live-a2edb7a8-c226-4478-861f-539a00109990"
+            src="https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990"
+            className="w-full h-full"
+            frameBorder="0"
+            scrolling="no"
+            allow="autoplay; encrypted-media"
+            allowFullScreen
+        />
       </section>
 
       {/* Information section below */}
       <section className="grid gap-4 sm:grid-cols-3 text-sm text-neutral-700">
         <div className="space-y-1">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                Access
+                Access (Testing INFO)
             </h2>
             <p>
             {stream.access === "free" && "Free to watch"}
@@ -99,7 +98,7 @@ export default function LivePage({ params }: LivePageProps) {
 
         <div className="space-y-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Matchup
+            Matchup (Testing INFO)
           </h2>
           <p>
             <span className="font-medium">{stream.schoolA}</span> vs{" "}
@@ -110,7 +109,7 @@ export default function LivePage({ params }: LivePageProps) {
 
         <div className="space-y-1">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Kickoff time
+            Kickoff time (Testing INFO)
           </h2>
           <p>{dateText}</p>
         </div>

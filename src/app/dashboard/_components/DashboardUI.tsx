@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Tv,
   Radio,
+  DotIcon,
   Calendar as CalendarIcon
 } from "lucide-react"; // Custom SVG icons
 import { UserButton, useUser } from "@clerk/nextjs";
@@ -19,6 +20,20 @@ import { RoleInitializer } from "./RoleInitializer"; // Set sign up user with ro
 import { format } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
+
+async function openBillingPortal() {
+  const res = await fetch('/api/stripe/create-portal-session', {
+    method: 'POST',
+  });
+
+  if (!res.ok) {
+    console.error('Failed to create portal session');
+    return;
+  }
+
+  const data = await res.json();
+  window.location.href = data.url;
+}
 
 type StartTimeFieldProps = {
   value: string;                    // ISO string
@@ -275,6 +290,22 @@ export type Stream = {
   slug: string; // /live/[slug]
 };
 
+// --- Fixed Data ---
+const MOCK_STREAMS_test: Stream[] = [
+{
+    id: "0",
+    title: "Varsity Sports Show Live Stream",
+    league: "Sports",
+    schoolA: "Test01",
+    schoolB: "Test02",
+    startAt: new Date().toISOString(),
+    priceUSD: 0,
+    status: "live",
+    thumbnail: "https://cdn.forumcomm.com/dims4/default/6df5ee2/2147483647/strip/true/crop/4000x2667+0+1/resize/840x560!/format/webp/quality/90/?url=https%3A%2F%2Fforum-communications-production-web.s3.us-west-2.amazonaws.com%2Fbrightspot%2Fc8%2Fa7%2F7aed3ece422ca6707ceb7d646ab0%2F111425-hsfb-howard-wall-class9a-12.jpg",
+    slug: "wolves-vs-tigers-2025w10",
+  },
+];
+
 // --- Mock Data remove or add for testing ---
 const MOCK_STREAMS: Stream[] = [
 {
@@ -390,8 +421,9 @@ function StreamCard({
             </p>
           </div>
           {/* Open Button check if Live, open external link to /live/[slug] */}
+          {/* href={`/live/${stream.slug}`}  */}
           <a
-            href={`/live/${stream.slug}`}
+            href={`/live_test`} 
             className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-50"
             title="Open stream"
           >
@@ -457,7 +489,7 @@ export default function DashboardUI() {
   const [tab, setTab] = useState<StreamStatus | "all">("all");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [viewMode, setViewMode] = useState<"viewer" | "admin">("viewer");
-  const [streams, setStreams] = useState<Stream[]>(MOCK_STREAMS); // TODO: Delete MOCK_STREAMS and replace with [] when official launch
+  const [streams, setStreams] = useState<Stream[]>(MOCK_STREAMS_test); // TODO: Delete MOCK_STREAMS and replace with [] when official launch
 
   const filtered = useMemo(() => {
     return streams.filter((s) => (tab === "all" ? true : s.status === tab)).filter((s) => {
@@ -563,7 +595,15 @@ export default function DashboardUI() {
                     avatarImage: "rounded-full border-2 border-violet-600",
                   },
                 }}
-              />
+              >
+                <UserButton.MenuItems>
+                  <UserButton.Action
+                    label="Subscription"
+                    labelIcon={<DotIcon />}
+                    onClick={openBillingPortal}
+                  />
+                </UserButton.MenuItems>
+              </UserButton>
             </div>
 
           </div>
