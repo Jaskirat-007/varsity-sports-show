@@ -737,14 +737,28 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
   const [league, setLeague] = useState("");
   const [schoolA, setSchoolA] = useState("");
   const [schoolB, setSchoolB] = useState("");
-  const [startAt, setStartAt] = useState<string>(
-    () => new Date().toISOString()
-  );
-  const [price, setPrice] = useState("6.99");
+  const [startAt, setStartAt] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30);
+    return now.toISOString();
+  });
+  const [price, setPrice] = useState("");
   const [thumbnail, setThumbnail] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
-  const [access, setAccess] = useState<"free" | "ppv" | "subscriber">("free");
+  type AccessType = "" | "free" | "ppv" | "subscriber";
+  const [access, setAccess] = useState<AccessType>("");
   const [submitting, setSubmitting] = useState(false);
+
+  const handleAccessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const value = e.target.value as AccessType | "blank";
+
+  if (value === "blank") {
+    setAccess("");
+    return;
+  }
+
+  setAccess(value);
+};
 
   const toSlug = (t: string) =>
     t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -752,9 +766,9 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
   const handleCreate = async () => {
       const requiredFields = [
       { value: title, name: "Title" },
+      { value: league, name: "League" },
       { value: schoolA, name: "Home / School A" },
       { value: schoolB, name: "Away / School B" },
-      { value: league, name: "League" },
       { value: startAt, name: "Start Time" },
       { value: access, name: "Access" },
       { value: thumbnail, name: "Thumbnail URL" },
@@ -766,6 +780,11 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
         alert(`${field.name} is required`);
         return;
       }
+    }
+
+    if (access === "ppv" && (!price || Number(price) <= 0)) {
+      alert("Price is required when access = Pay-per-view");
+      return;
     }
 
     try {
@@ -802,48 +821,84 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label>
-          <div className="text-sm font-medium mb-1">Title</div>
-          <input
-            className="w-full border rounded-lg px-3 py-2"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Wolves vs Tigers"
-          />
+          <div className="text-sm font-medium mb-1">Game Title</div>
+          <div className="relative">
+            <input required
+              className="w-full border rounded-lg px-3 py-2"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Wolves vs Tigers"
+            />
+            <button
+              type="button"
+              onClick={() => setTitle("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </label>
 
         <label>
           <div className="text-sm font-medium mb-1">League</div>
-          <input
-            className="w-full border rounded-lg px-3 py-2"
-            value={league}
-            onChange={(e) => setLeague(e.target.value)}
-            placeholder="HS Football"
-          />
+          <div className="relative">
+            <input required
+              className="w-full border rounded-lg px-3 py-2"
+              value={league}
+              onChange={(e) => setLeague(e.target.value)}
+              placeholder="HS Football"
+            />
+            <button
+              type="button"
+              onClick={() => setLeague("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </label>
 
         <label>
           <div className="text-sm font-medium mb-1">Home / School A</div>
-          <input
-            className="w-full border rounded-lg px-3 py-2"
-            value={schoolA}
-            onChange={(e) => setSchoolA(e.target.value)}
-            placeholder="Desert Ridge"
-          />
+          <div className="relative">
+            <input required
+              className="w-full border rounded-lg px-3 py-2"
+              value={schoolA}
+              onChange={(e) => setSchoolA(e.target.value)}
+              placeholder="Desert Ridge"
+            />
+            <button
+              type="button"
+              onClick={() => setSchoolA("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </label>
 
         <label>
           <div className="text-sm font-medium mb-1">Away / School B</div>
-          <input
-            className="w-full border rounded-lg px-3 py-2"
-            value={schoolB}
-            onChange={(e) => setSchoolB(e.target.value)}
-            placeholder="Mesa East"
-          />
+          <div className="relative">
+            <input required
+              className="w-full border rounded-lg px-3 py-2"
+              value={schoolB}
+              onChange={(e) => setSchoolB(e.target.value)}
+              placeholder="Mesa East"
+            />
+            <button
+              type="button"
+              onClick={() => setSchoolB("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </label>
 
         <label>
-          <div className="text-sm font-medium mb-1">Start Time</div>
-          <StartTimeField
+          <div className="text-sm font-medium mb-1">Start Time (Default 30 mins later)</div>
+          <StartTimeField 
             value={startAt}
             onChange={(iso) => setStartAt(iso)}
           />
@@ -854,22 +909,41 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
           <select
             className="w-full border rounded-lg px-3 py-2"
             value={access}
-            onChange={(e) => setAccess(e.target.value as any)}
+            onChange={handleAccessChange}
+            required
           >
+            <option value="" disabled hidden>
+              Select access type...
+            </option>
+
+            <option value="blank"> </option>
             <option value="free">Free</option>
             <option value="ppv">Pay-per-view</option>
             <option value="subscriber">Subscriber only</option>
           </select>
         </label>
 
-        {access !== "free" && (
+        {access == "ppv" && (
           <label>
             <div className="text-sm font-medium mb-1">Price</div>
-            <input
-              className="w-full border rounded-lg px-3 py-2"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
+            <div className="relative">
+              <span className="absolute inset-y-0 left-3 flex items-center font-bold text-gray-500">$</span>   
+              <input required
+                min="0"
+                step="0.01"
+                className="w-full border rounded-lg px-3 py-2 pl-8 pr-10"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="9.99"
+              />
+              <button
+                type="button"
+                onClick={() => setPrice("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
           </label>
         )}
 
@@ -910,12 +984,21 @@ function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
 
         <label className="sm:col-span-2">
           <div className="text-sm font-medium mb-1">Stream Source (Click Dacast share link to get iframe URL & Paste here)</div>
-          <input
-            className="w-full border rounded-lg px-3 py-2"
-            value={sourceUrl}
-            onChange={(e) => setSourceUrl(e.target.value)}
-            placeholder="e.g., https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990"
-          />
+          <div className="relative">
+            <input
+              className="w-full border rounded-lg px-3 py-2"
+              value={sourceUrl}
+              onChange={(e) => setSourceUrl(e.target.value)}
+              placeholder="e.g., https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990"
+            />
+            <button
+              type="button"
+              onClick={() => setSourceUrl("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </label>
       </div>
 
