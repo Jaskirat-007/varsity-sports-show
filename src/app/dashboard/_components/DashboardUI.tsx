@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { UploadPanel } from "./UploadPanel";
 import {
   Play, // Open Icon
   Calendar, // Upcoming Icon
@@ -17,7 +18,12 @@ import {
   Calendar as CalendarIcon
 } from "lucide-react"; // Custom SVG icons
 import { UserButton, useUser } from "@clerk/nextjs";
+import Link from "next/link";
 import { RoleInitializer } from "./RoleInitializer"; // Set sign up user with role = viewer
+
+function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
+  return <div className="p-4 border rounded-md text-neutral-500 bg-white shadow-sm">Create Livestream Panel (Coming Soon)</div>;
+}
 import { format } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
@@ -102,9 +108,13 @@ export function StartTimeField({ value, onChange }: StartTimeFieldProps) {
     const h = d.getHours();
     const h12 = h % 12 || 12;
     const m = d.getMinutes();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDate(d);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHour(h12);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMinute(String(m).padStart(2, "0"));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAmpm(h >= 12 ? "PM" : "AM");
   }, [value]);
 
@@ -292,6 +302,13 @@ export type Stream = {
   sourceUrl: string; 
 };
 
+export type Video = {
+  id: string;
+  title: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+};
+
 // --- Fixed Data ---
 const MOCK_STREAMS_test: Stream[] = [
 {
@@ -428,20 +445,48 @@ function StreamCard({
             </p>
           </div>
           {/* Open Button check if Live, open external link to /live/[slug] */}
-          {/* href={`/live/${stream.slug}`}  */}
-          <a
-            href={`/live_test`} 
+          <Link
+            href={`/live/${stream.slug}`} 
             className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-50"
             title="Open stream"
           >
             {stream.status === "live" ? <Play className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />} Open
-          </a>
+          </Link>
         </div>
 
         {/* Livestream Time Info */}
         <div className="mt-2 text-sm text-neutral-600 flex items-center gap-2">
           <Calendar className="h-4 w-4" />
           <span>{timeText}</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function VideoCard({ video, layout = "grid" }: { video: Video; layout?: "grid" | "list" }) {
+  return (
+    <Card className={layout === "list" ? "flex overflow-hidden" : "overflow-hidden"}>
+      <div className={layout === "list" ? "w-48 shrink-0" : "aspect-video w-full"}>
+        <div className="relative h-full w-full bg-neutral-200">
+          {/* Thumbnail */}
+          <img src={video.thumbnailUrl} alt={video.title} className="h-full w-full object-cover" />
+        </div>
+      </div>
+
+      <div className={layout === "list" ? "flex-1 p-4" : "p-4"}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            {/* Livestream Title */}
+            <h3 className="text-base font-semibold leading-tight line-clamp-2">{video.title}</h3>
+          </div>
+          <Link
+            href={`/video/${video.id}?videoUrl=${encodeURIComponent(video.videoUrl)}`}
+            className="inline-flex items-center gap-1 rounded-full border border-neutral-200 px-3 py-1.5 text-sm hover:bg-neutral-50"
+            title="Open stream"
+          >
+            <Play className="h-4 w-4" /> Open
+          </Link>
         </div>
       </div>
     </Card>
@@ -496,7 +541,32 @@ export default function DashboardUI() {
   const [tab, setTab] = useState<StreamStatus | "all">("all");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [viewMode, setViewMode] = useState<"viewer" | "admin">("viewer");
+  const [adminView, setAdminView] = useState<"create" | "upload">("create");
   const [streams, setStreams] = useState<Stream[]>(MOCK_STREAMS_test); // TODO: Delete MOCK_STREAMS and replace with [] when official launch
+  const [videos, setVideos] = useState<Video[]>([]);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/list-videos");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setVideos(data);
+        } else {
+          console.error("Received non-array data for videos:", data);
+          setVideos([]);
+        }
+      } catch (error) {
+        console.error("Error fetching videos:", error);
+        setVideos([]);
+      }
+    };
+
+    fetchVideos();
+  }, []);
 
   const filtered = useMemo(() => {
     return streams.filter((s) => (tab === "all" ? true : s.status === tab)).filter((s) => {
@@ -505,7 +575,7 @@ export default function DashboardUI() {
       const hay = `${s.title} ${s.schoolA} ${s.schoolB} ${s.league}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [query, tab]);
+  }, [query, tab, streams]);
 
   const live = filtered.filter((s) => s.status === "live");
   const upcoming = filtered.filter((s) => s.status === "upcoming");
@@ -621,7 +691,34 @@ export default function DashboardUI() {
       <main className="mx-auto max-w-7xl px-4 py-6">
         {/* Admin Mode */}
         {viewMode === "admin" && isAdmin && (
-          <AdminPanel onCreated={(s) => setStreams((prev) => [s, ...prev])} />
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAdminView("create")}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  adminView === "create"
+                    ? "bg-black text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
+              >
+                Create Livestream
+              </button>
+              <button
+                onClick={() => setAdminView("upload")}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  adminView === "upload"
+                    ? "bg-black text-white"
+                    : "bg-gray-200 text-gray-800"
+                }`}
+              >
+                Upload Livestream
+              </button>
+            </div>
+            {adminView === "create" && (
+              <AdminPanel onCreated={(s) => setStreams((prev) => [s, ...prev])} />
+            )}
+            {adminView === "upload" && <UploadPanel />}
+          </div>
         )}
 
         {/* Viewer Mode */}
@@ -633,7 +730,7 @@ export default function DashboardUI() {
                 {/* Section grid / View all Button*/}
                 <div className="mb-3 flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Live now</h2>
-                  <a href="/live" className="text-sm text-neutral-700 hover:underline">View all</a>
+                  <Link href="/live" className="text-sm text-neutral-700 hover:underline">View all</Link>
                 </div>
 
                 {live.length === 0 ? (
@@ -683,30 +780,28 @@ export default function DashboardUI() {
             ) : null}
 
             { /* Past Games section */ }
-            {tab === "all" || tab === "past" ? (
-              <section className="mb-8">
-                <div className="mb-3 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold">Past Games</h2>
-                  <a href="/replays" className="text-sm text-neutral-700 hover:underline">Browse replays</a>
-                </div>
+            <section className="mb-8">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Past Games</h2>
+                <a href="/replays" className="text-sm text-neutral-700 hover:underline">Browse replays</a>
+              </div>
 
-                {past.length === 0 ? (
-                  <EmptyState variant="past" />
-                ) : layout === "grid" ? (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {past.map((s) => (
-                      <StreamCard key={s.id} stream={s} layout="grid" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {past.map((s) => (
-                      <StreamCard key={s.id} stream={s} layout="list" />
-                    ))}
-                  </div>
-                )}
-              </section>
-            ) : null}
+              {videos.length === 0 ? (
+                <EmptyState variant="past" />
+              ) : layout === "grid" ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {videos.map((v) => (
+                    <VideoCard key={v.id} video={v} layout="grid" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {videos.map((v) => (
+                    <VideoCard key={v.id} video={v} layout="list" />
+                  ))}
+                </div>
+              )}
+            </section>
 
             {/* Footer CTA */}
             <div className="mt-12 rounded-2xl border border-neutral-200 bg-gradient-to-br from-neutral-50 to-white p-6 text-center">
@@ -727,288 +822,6 @@ export default function DashboardUI() {
 
 
       </main>
-    </div>
-  );
-}
-
-// Admin Panel
-function AdminPanel({ onCreated }: { onCreated: (s: Stream) => void }) {
-  const [title, setTitle] = useState("");
-  const [league, setLeague] = useState("");
-  const [schoolA, setSchoolA] = useState("");
-  const [schoolB, setSchoolB] = useState("");
-  const [startAt, setStartAt] = useState(() => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + 30);
-    return now.toISOString();
-  });
-  const [price, setPrice] = useState("");
-  const [thumbnail, setThumbnail] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
-  type AccessType = "" | "free" | "ppv" | "subscriber";
-  const [access, setAccess] = useState<AccessType>("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const handleAccessChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-  const value = e.target.value as AccessType | "blank";
-
-  if (value === "blank") {
-    setAccess("");
-    return;
-  }
-
-  setAccess(value);
-};
-
-  const toSlug = (t: string) =>
-    t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-
-  const handleCreate = async () => {
-      const requiredFields = [
-      { value: title, name: "Title" },
-      { value: league, name: "League" },
-      { value: schoolA, name: "Home / School A" },
-      { value: schoolB, name: "Away / School B" },
-      { value: startAt, name: "Start Time" },
-      { value: access, name: "Access" },
-      { value: thumbnail, name: "Thumbnail URL" },
-      { value: sourceUrl, name: "Stream Source" },
-    ];
-
-    for (const field of requiredFields) {
-      if (!field.value || field.value.toString().trim() === "") {
-        alert(`${field.name} is required`);
-        return;
-      }
-    }
-
-    if (access === "ppv" && (!price || Number(price) <= 0)) {
-      alert("Price is required when access = Pay-per-view");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-
-      const created: Stream = {
-        id: Date.now().toString(),
-        title,
-        league,
-        schoolA,
-        schoolB,
-        startAt: new Date(startAt).toISOString(),
-        priceUSD: access === "free" ? undefined : Number(price),
-        status:
-          new Date(startAt).getTime() <= Date.now()
-            ? "live"
-            : "upcoming",
-        thumbnail:
-          thumbnail,
-        slug: toSlug(`${schoolA}-${schoolB}-${title}`),
-        sourceUrl,
-      };
-
-      onCreated(created);
-      alert("Stream created!");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="rounded-2xl border border-neutral-200 bg-white p-6">
-      <h2 className="text-lg font-semibold mb-4">Create Livestream - TESTING Feature Not Submit</h2>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label>
-          <div className="text-sm font-medium mb-1">Game Title</div>
-          <div className="relative">
-            <input required
-              className="w-full border rounded-lg px-3 py-2"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Wolves vs Tigers"
-            />
-            <button
-              type="button"
-              onClick={() => setTitle("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </label>
-
-        <label>
-          <div className="text-sm font-medium mb-1">League</div>
-          <div className="relative">
-            <input required
-              className="w-full border rounded-lg px-3 py-2"
-              value={league}
-              onChange={(e) => setLeague(e.target.value)}
-              placeholder="HS Football"
-            />
-            <button
-              type="button"
-              onClick={() => setLeague("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </label>
-
-        <label>
-          <div className="text-sm font-medium mb-1">Home / School A</div>
-          <div className="relative">
-            <input required
-              className="w-full border rounded-lg px-3 py-2"
-              value={schoolA}
-              onChange={(e) => setSchoolA(e.target.value)}
-              placeholder="Desert Ridge"
-            />
-            <button
-              type="button"
-              onClick={() => setSchoolA("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </label>
-
-        <label>
-          <div className="text-sm font-medium mb-1">Away / School B</div>
-          <div className="relative">
-            <input required
-              className="w-full border rounded-lg px-3 py-2"
-              value={schoolB}
-              onChange={(e) => setSchoolB(e.target.value)}
-              placeholder="Mesa East"
-            />
-            <button
-              type="button"
-              onClick={() => setSchoolB("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </label>
-
-        <label>
-          <div className="text-sm font-medium mb-1">Start Time (Default 30 mins later)</div>
-          <StartTimeField 
-            value={startAt}
-            onChange={(iso) => setStartAt(iso)}
-          />
-        </label>
-
-        <label>
-          <div className="text-sm font-medium mb-1">Access</div>
-          <select
-            className="w-full border rounded-lg px-3 py-2"
-            value={access}
-            onChange={handleAccessChange}
-            required
-          >
-            <option value="" disabled hidden>
-              Select access type...
-            </option>
-
-            <option value="blank"> </option>
-            <option value="free">Free</option>
-            <option value="ppv">Pay-per-view</option>
-            <option value="subscriber">Subscriber only</option>
-          </select>
-        </label>
-
-        {access == "ppv" && (
-          <label>
-            <div className="text-sm font-medium mb-1">Price</div>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-3 flex items-center font-bold text-gray-500">$</span>   
-              <input required
-                min="0"
-                step="0.01"
-                className="w-full border rounded-lg px-3 py-2 pl-8 pr-10"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="9.99"
-              />
-              <button
-                type="button"
-                onClick={() => setPrice("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </label>
-        )}
-
-        <label className="sm:col-span-2">
-          <div className="text-sm font-medium mb-1">
-            Thumbnail URL (This will appear at the dashboard grid, Fill in for preview below)
-          </div>
-          <div className="relative">
-            <input required
-              className="w-full border rounded-lg px-3 py-2"
-              value={thumbnail}
-              onChange={(e) => setThumbnail(e.target.value)}
-              placeholder="e.g., https://images.unsplash.com/photo-1546527868-ccb7ee7dfa6a?w=1200&q=80&auto=format&fit=crop"
-            />
-            <button
-              type="button"
-              onClick={() => setThumbnail("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-
-          {thumbnail && (
-            <div className="mt-3">
-              <p className="text-xs text-gray-500 mb-1">Thumbnail Preview:</p>
-              <img
-                src={thumbnail}
-                alt="Thumbnail preview"
-                className="w-48 h-28 object-cover rounded border"
-                onError={(e) => {
-                  e.currentTarget.src = "";
-                }}
-              />
-            </div>
-          )}
-        </label>
-
-        <label className="sm:col-span-2">
-          <div className="text-sm font-medium mb-1">Stream Source (Click Dacast share link to get iframe URL & Paste here)</div>
-          <div className="relative">
-            <input
-              className="w-full border rounded-lg px-3 py-2"
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="e.g., https://iframe.dacast.com/live/80cea297-81e0-24ec-924b-772c26b87f56/a2edb7a8-c226-4478-861f-539a00109990"
-            />
-            <button
-              type="button"
-              onClick={() => setSourceUrl("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </label>
-      </div>
-
-      <button
-        onClick={handleCreate}
-        disabled={submitting}
-        className="mt-6 rounded-full bg-black px-5 py-2 text-sm font-medium text-white"
-      >
-        {submitting ? "Creating..." : "Create livestream"}
-      </button>
     </div>
   );
 }
