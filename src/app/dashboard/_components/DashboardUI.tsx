@@ -366,7 +366,7 @@ export default function DashboardUI() {
                   <p className="mt-1 text-sm text-neutral-600">Use the search above or go to the full schedule to find your team.</p>
                   <div className="mt-4 inline-flex gap-2">
                     <a href="https://varsitysportsshow.com/schedule" target="_blank" rel="noopener noreferrer" className="rounded-full bg-black px-4 py-2 text-sm font-medium text-white">Full schedule</a>
-                    <a href="https://varsitysportsshow.com/plans" target="_blank" rel="noopener noreferrer" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50">Subscription plans</a>
+                    <a href="/test" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium hover:bg-neutral-50">Subscription plans</a>
                   </div>
                 </div>
               </>
