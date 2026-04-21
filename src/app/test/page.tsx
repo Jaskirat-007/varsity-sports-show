@@ -17,8 +17,8 @@ export default function PricingPage() {
       />
 
       <StripePricingTable
-        pricing-table-id="prctbl_1TOh6201dSxu5ypyKDDs5A1O"
-        publishable-key="pk_live_51RFpQK01dSxu5ypy7LPPn7z3sDNXglmULVZmTb2Ww2CJt9Ii8dVlhSYaOT8OZE5uvgLjjaNO83AVs1brvP8zU8kg007fGNeVnD"
+        pricing-table-id="prctbl_1TOi5301dSxu5ypyEefa6DDD"
+        publishable-key="pk_test_51RFpQK01dSxu5ypyWzBJ97UpiMoPMxEXyCKhSW7yGcci9MLJxIFZnRwrCl43ZhLoEKxNiOwCJbIR6EuW4EW5th2000b3JTuTCQ"
       />
     </div>
   );
