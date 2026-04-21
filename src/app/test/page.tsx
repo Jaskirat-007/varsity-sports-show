@@ -8,7 +8,7 @@ const StripePricingTable = "stripe-pricing-table" as any;
 export default function PricingPage() {
   return (
     <div style={{ padding: "40px" }}>
-      <h1>Stripe Sandbox Price Table</h1>
+      <h1>SUBSCRIBE NOW</h1>
 
       <Script
         async
@@ -17,8 +17,8 @@ export default function PricingPage() {
       />
 
       <StripePricingTable
-        pricing-table-id="prctbl_1SXGoW03A6rG1wdvAtRct7Pa"
-        publishable-key="pk_test_51RFpQX03A6rG1wdvs2erdWhY6SsDuN2On5wOXqpMjFNtQHDsNla5cbFy6TxpS90Cb0KKTwG7bNz6MMRAXxdxOIIA00zLkBq87v"
+        pricing-table-id="prctbl_1TOh6201dSxu5ypyKDDs5A1O"
+        publishable-key="pk_live_51RFpQK01dSxu5ypy7LPPn7z3sDNXglmULVZmTb2Ww2CJt9Ii8dVlhSYaOT8OZE5uvgLjjaNO83AVs1brvP8zU8kg007fGNeVnD"
       />
     </div>
   );
