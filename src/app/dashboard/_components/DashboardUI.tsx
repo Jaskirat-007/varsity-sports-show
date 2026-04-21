@@ -25,10 +25,7 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 
 async function openBillingPortal() {
-  const res = await fetch('/api/stripe/create-portal-session', { method: 'POST' });
-  if (!res.ok) { console.error('Failed to create portal session'); return; }
-  const data = await res.json();
-  window.location.href = data.url;
+  window.location.href = '/test';
 }
 
 type StartTimeFieldProps = { value: string; onChange: (value: string) => void };
